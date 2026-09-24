@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AURA OS — QD-OLED Smart TV System</title>
+
+  <!-- HLS.js for Live Channel (.m3u8) Playback -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <style>
+    /* ==========================================================================
+       RESET & BASE STYLES
+       ========================================================================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: #020204;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      padding: 10px;
+    }
+
+    .tv-environment {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 1280px;
+      height: 96vh;
+      position: relative;
+    }
+
+    /* ==========================================================================
+       HARDWARE PRESENTATION (QD-OLED TV FRAME & SOUNDBAR)
+       ========================================================================== */
+    .tv-casing {
+      width: 100%;
+      flex: 1;
+      max-height: 800px;
+      background: linear-gradient(145deg, #12151c, #08090c);
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 24px 60px rgba(0, 0, 0, 0.95),
+        0 0 35px rgba(56, 189, 248, 0.06);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: opacity 0.3s ease, filter 0.3s ease;
+    }
+
+    .tv-casing.power-off {
+      opacity: 0.15;
+      filter: grayscale(100%);
+    }
+
+    .tv-screen-bezel {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid #1e293b;
+    }
+
+    .tv-chin {
+      height: 18px;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .brand-logo {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #64748b;
+      text-transform: uppercase;
+    }
+
+    .tv-power-led {
+      width: 5px;
+      height: 5px;
+      background: #00ffaa;
+      border-radius: 50%;
+      position: absolute;
+      right: 16px;
+      box-shadow: 0 0 8px #00ffaa;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .tv-power-led.off {
+      background: #ef4444;
+      box-shadow: 0 0 6px #ef4444;
+    }
+
+    .tv-stand-soundbar-container {
+      width: 70%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 6px;
+      z-index: 2;
+    }
+
+    .soundbar {
+      width: 85%;
+      height: 22px;
+      background: linear-gradient(180deg, #1c1e24 0%, #090a0c 100%);
+      border-radius: 4px;
+      border: 1px solid #2d3139;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.7);
+    }
+
+    .soundbar-mesh {
+      height: 4px;
+      width: 70%;
+      background: repeating-linear-gradient(90deg, #333 0px, #333 2px, transparent 2px, transparent 4px);
+      border-radius: 2px;
+    }
+
+    .soundbar-led {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+    }
+
+    /* ==========================================================================
+       AURA SMART OS INTERFACE
+       ========================================================================== */
+    .os-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .video-viewport {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      background: #000 url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80') center/cover no-repeat;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-viewport iframe,
+    .video-viewport video {
+      width: 100%;
+      height: 100%;
+      border: none;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .os-ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      background: linear-gradient(180deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.25) 40%, rgba(2,6,23,0.95) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 28px;
+      transition: opacity 0.3s ease;
+    }
+
+    .os-ui-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .os-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .os-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .os-badge {
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      color: #000;
+      font-size: 11px;
+      font-weight: 900;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 1px;
+    }
+
+    .os-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #fff;
+    }
+
+    .os-status {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .os-clock {
+      color: #f8fafc;
+      font-weight: 600;
+    }
+
+    .os-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    .hero-info {
+      max-width: 540px;
+      margin-bottom: 16px;
+    }
+
+    .hero-category {
+      color: #38bdf8;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 6px;
+    }
+
+    .hero-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+
+    .hero-desc {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    /* Modal List Grid Containers */
+    .app-panel {
+      background: rgba(15, 23, 42, 0.90);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      height: 260px;
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .app-panel.active {
+      display: flex;
+    }
+
+    .panel-header-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .search-input-box {
+      flex: 1;
+      background: #020617;
+      border: 1px solid #334155;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      min-width: 180px;
+    }
+
+    .search-input-box:focus, .search-input-box.focused {
+      border-color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+    }
+
+    .filter-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .filter-btn.active, .filter-btn:hover {
+      background: #38bdf8;
+      color: #000;
+      border-color: #38bdf8;
+    }
+
+    .panel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+      overflow-y: auto;
+      flex: 1;
+      padding-right: 4px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      outline: none;
+    }
+
+    .card:hover, .card:focus, .card.focused {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.18);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(56, 189, 248, 0.3);
+    }
+
+    .card-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      background: #020617;
+      object-fit: contain;
+      padding: 2px;
+      border: 1px solid #334155;
+      flex-shrink: 0;
+    }
+
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .card-sub {
+      font-size: 10px;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Custom Input Panel */
+    .input-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.92);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid #38bdf8;
+      max-width: 520px;
+      margin-bottom: 15px;
+    }
+
+    .input-panel.active {
+      display: flex;
+    }
+
+    .url-input {
+      width: 100%;
+      background: #020617;
+      border: 1px solid #334155;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .url-input:focus, .url-input.focused {
+      border-color: #38bdf8;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+    }
+
+    .btn-submit {
+      background: #38bdf8;
+      color: #020617;
+      font-weight: 700;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .btn-submit:hover, .btn-submit:focus, .btn-submit.focused {
+      background: #7dd3fc;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+    }
+
+    /* Bottom App Dock */
+    .app-dock {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding-top: 6px;
+    }
+
+    .dock-item {
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid transparent;
+      padding: 10px 16px;
+      border-radius: 10px;
+      color: #f8fafc;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      outline: none;
+    }
+
+    .dock-item:hover, .dock-item:focus, .dock-item.focused {
+      background: #ffffff;
+      color: #020617;
+      border-color: #38bdf8;
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(255, 255, 255, 0.25);
+    }
+
+    .dock-item.active-tab {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.22);
+      color: #38bdf8;
+    }
+
+    /* ==========================================================================
+       DYNAMIC SCREEN SAVER
+       ========================================================================== */
+    .screensaver {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      z-index: 100;
+      display: none;
+      overflow: hidden;
+    }
+
+    .screensaver.active {
+      display: block;
+    }
+
+    .ss-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.5;
+      animation: floatOrb 12s infinite alternate ease-in-out;
+    }
+
+    .ss-orb-1 {
+      width: 260px;
+      height: 260px;
+      background: #38bdf8;
+      top: 15%;
+      left: 15%;
+    }
+
+    .ss-orb-2 {
+      width: 320px;
+      height: 320px;
+      background: #c084fc;
+      bottom: 10%;
+      right: 15%;
+      animation-delay: -4s;
+    }
+
+    .ss-clock {
+      position: absolute;
+      font-size: 64px;
+      font-weight: 200;
+      color: rgba(255, 255, 255, 0.85);
+      letter-spacing: 2px;
+      text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+      animation: bounceClock 22s infinite ease-in-out alternate;
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(140px, 90px) scale(1.2); }
+    }
+
+    @keyframes bounceClock {
+      0% { top: 12%; left: 12%; }
+      50% { top: 60%; left: 55%; }
+      100% { top: 22%; left: 68%; }
+    }
+
+    /* ==========================================================================
+       SMART REMOTE CONTROL
+       ========================================================================== */
+    .remote-wrapper {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 50;
+    }
+
+    .remote-toggle-btn {
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #334155;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+
+    .remote-control {
+      width: 144px;
+      background: linear-gradient(145deg, #181a20, #08090c);
+      border: 1px solid #334155;
+      border-radius: 24px;
+      padding: 16px 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .remote-control.collapsed {
+      display: none;
+    }
+
+    .remote-top-row {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0 4px;
+    }
+
+    .r-btn {
+      background: #2a2d35;
+      border: 1px solid #3a3f4b;
+      color: #e2e8f0;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .r-btn:active {
+      transform: scale(0.92);
+      background: #38bdf8;
+      color: #000;
+    }
+
+    .r-btn-power {
+      background: #991b1b;
+      border-color: #ef4444;
+      color: #fff;
+    }
+
+    .dpad {
+      width: 96px;
+      height: 96px;
+      background: #15171c;
+      border-radius: 50%;
+      position: relative;
+      border: 1px solid #2d3139;
+    }
+
+    .dpad-btn {
+      position: absolute;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 11px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .dpad-up { top: 4px; left: 34px; width: 28px; height: 24px; }
+    .dpad-down { bottom: 4px; left: 34px; width: 28px; height: 24px; }
+    .dpad-left { top: 34px; left: 4px; width: 24px; height: 28px; }
+    .dpad-right { top: 34px; right: 4px; width: 24px; height: 28px; }
+
+    .dpad-ok {
+      top: 28px;
+      left: 28px;
+      width: 40px;
+      height: 40px;
+      background: #2a2d35;
+      border-radius: 50%;
+      color: #fff;
+      font-weight: 700;
+      font-size: 10px;
+    }
+
+    .remote-rockers {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0 6px;
+    }
+
+    .rocker-column {
+      display: flex;
+      flex-direction: column;
+      background: #15171c;
+      border-radius: 12px;
+      border: 1px solid #2d3139;
+      padding: 2px;
+    }
+
+    .rocker-btn {
+      width: 30px;
+      height: 26px;
+      background: transparent;
+      border: none;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .panel-grid::-webkit-scrollbar {
+      width: 6px;
+    }
+    .panel-grid::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+
+    /* ==========================================================================
+       RESPONSIVE & MOBILE STYLES
+       ========================================================================== */
+    @media (max-width: 768px) {
+      body { padding: 4px; }
+      .tv-environment { height: 98vh; }
+      .tv-casing { border-radius: 6px; padding: 4px; }
+      .os-ui-overlay { padding: 14px; }
+      .hero-title { font-size: 18px; }
+      .hero-desc { font-size: 10px; }
+      .dock-item { padding: 8px 10px; font-size: 10px; }
+
+      @media (orientation: portrait) {
+        .tv-environment { justify-content: flex-start; padding-top: 10px; }
+        .tv-casing { max-height: 48vh; }
+        .remote-wrapper { position: relative; right: auto; bottom: auto; margin-top: 15px; }
+        .remote-control { width: 100%; max-width: 280px; flex-direction: row; justify-content: space-between; border-radius: 16px; padding: 10px 16px; }
+        .remote-rockers { width: auto; gap: 10px; }
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TV ENVIRONMENT -->
+  <div class="tv-environment">
+    
+    <!-- QD-OLED TV FRAME -->
+    <div class="tv-casing" id="tvCasing">
+      <div class="tv-screen-bezel">
+        
+        <!-- AURA OS SYSTEM -->
+        <div class="os-container">
+          
+          <!-- OLED SCREEN SAVER -->
+          <div class="screensaver" id="screensaver">
+            <div class="ss-orb ss-orb-1"></div>
+            <div class="ss-orb ss-orb-2"></div>
+            <div class="ss-clock" id="ssClock">00:00</div>
+          </div>
+
+          <!-- VIDEO PLAYER CONTAINER -->
+          <div class="video-viewport" id="videoViewport"></div>
+
+          <!-- SMART OS OVERLAY -->
+          <div class="os-ui-overlay" id="osUiOverlay">
+            
+            <div class="os-header">
+              <div class="os-brand">
+                <span class="os-badge">QD-OLED</span>
+                <span class="os-title">AURA OS</span>
+              </div>
+              <div class="os-status">
+                <span id="volumeStatus">🔊 80%</span>
+                <span id="networkStatus">⚡ 4K HDR</span>
+                <span class="os-clock" id="osClock">12:00 PM</span>
+              </div>
+            </div>
+
+            <div class="os-content">
+              
+              <!-- Internet Archive App Panel (Advanced API Search) -->
+              <div class="app-panel" id="archivePanel">
+                <div class="panel-header-controls">
+                  <input type="text" class="search-input-box" id="archiveSearchInput" placeholder="Search Internet Archive videos & series..." onkeydown="if(event.key==='Enter') executeArchiveSearch()">
+                  <button class="filter-btn active" onclick="setArchiveFilter('movies', this)">Movies</button>
+                  <button class="filter-btn" onclick="setArchiveFilter('tv', this)">TV Shows</button>
+                  <button class="filter-btn" onclick="setArchiveFilter('animation', this)">Animation</button>
+                  <button class="filter-btn" onclick="setArchiveFilter('all', this)">All Video</button>
+                </div>
+                <div class="panel-grid" id="archiveGrid"></div>
+              </div>
+
+              <!-- Live IPTV App Panel (All IPTV-Org Channels + Logos + Names) -->
+              <div class="app-panel" id="iptvPanel">
+                <div class="panel-header-controls">
+                  <input type="text" class="search-input-box" id="iptvSearchInput" placeholder="Search 29,000+ live IPTV channels by name..." oninput="filterIPTVChannels()">
+                  <span style="font-size:11px; color:#38bdf8; font-weight: 700;" id="iptvCountBadge">Loading Database...</span>
+                </div>
+                <div class="panel-grid" id="iptvGrid" onscroll="handleIPTVScroll(this)"></div>
+              </div>
+
+              <!-- Stream / YouTube Input Panel -->
+              <div class="input-panel" id="customInputPanel">
+                <div style="font-weight: 700; color: #fff; font-size: 14px;">Custom Video / Stream Player</div>
+                <input type="text" class="url-input" id="streamUrlInput" placeholder="Paste YouTube URL, HLS (.m3u8), or MP4 stream link..." tabindex="0">
+                <button class="btn-submit" onclick="loadCustomUrl()" tabindex="0">Launch Stream</button>
+              </div>
+
+              <!-- Default Hero Screen -->
+              <div class="hero-info" id="heroInfo">
+                <div class="hero-category" id="heroCategory">AURA OS HOME</div>
+                <div class="hero-title" id="heroTitle">Quantum OLED Smart Experience</div>
+                <div class="hero-desc" id="heroDesc">Explore full Internet Archive collections via Advanced API search, or stream 29,900+ live TV channels with official logos from around the world using iptv-org GitHub databases.</div>
+              </div>
+
+            </div>
+
+            <!-- Bottom Dock Nav -->
+            <div class="app-dock" id="appDock">
+              <div class="dock-item active-tab" tabindex="0" onclick="switchTab('home')" id="tabHome">
+                <span>🏠 Home</span>
+              </div>
+              <div class="dock-item" tabindex="0" onclick="switchTab('archive')" id="tabArchive">
+                <span>🏛️ Internet Archive</span>
+              </div>
+              <div class="dock-item" tabindex="0" onclick="switchTab('iptv')" id="tabIptv">
+                <span>📺 Live IPTV</span>
+              </div>
+              <div class="dock-item" tabindex="0" onclick="switchTab('custom')" id="tabCustom">
+                <span>🔗 Stream / YouTube</span>
+              </div>
+              <div class="dock-item" tabindex="0" onclick="triggerScreenSaver()">
+                <span>✨ Screen Saver</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="tv-chin">
+        <span class="brand-logo">AURA OLED</span>
+        <div class="tv-power-led" id="tvLed"></div>
+      </div>
+    </div>
+
+    <!-- SOUNDBAR -->
+    <div class="tv-stand-soundbar-container">
+      <div class="soundbar">
+        <div class="soundbar-led"></div>
+        <div class="soundbar-mesh"></div>
+        <div style="font-size: 8px; color: #64748b; font-weight: 800; letter-spacing: 1px;">DOLBY ATMOS</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- REMOTE CONTROL OVERLAY -->
+  <div class="remote-wrapper">
+    <div class="remote-control" id="remoteControl">
+      <div class="remote-top-row">
+        <button class="r-btn r-btn-power" onclick="togglePower()" title="Power On/Off">⚡</button>
+        <button class="r-btn" onclick="toggleUI()" title="Toggle Interface">👁️</button>
+      </div>
+
+      <div class="dpad">
+        <button class="dpad-btn dpad-up" onclick="navigate('up')">▲</button>
+        <button class="dpad-btn dpad-down" onclick="navigate('down')">▼</button>
+        <button class="dpad-btn dpad-left" onclick="navigate('left')">◄</button>
+        <button class="dpad-btn dpad-right" onclick="navigate('right')">►</button>
+        <button class="dpad-btn dpad-ok" onclick="pressSelect()">OK</button>
+      </div>
+
+      <div class="remote-rockers">
+        <div class="rocker-column">
+          <button class="rocker-btn" onclick="changeVolume(1)">+</button>
+          <span style="font-size: 8px; text-align: center; color: #64748b; font-weight:700;">VOL</span>
+          <button class="rocker-btn" onclick="changeVolume(-1)">-</button>
+        </div>
+        <div class="rocker-column">
+          <button class="rocker-btn" onclick="switchTab('iptv')">▲</button>
+          <span style="font-size: 8px; text-align: center; color: #64748b; font-weight:700;">CH</span>
+          <button class="rocker-btn" onclick="switchTab('iptv')">▼</button>
+        </div>
+      </div>
+
+      <div class="remote-top-row">
+        <button class="r-btn" onclick="switchTab('home')" title="Home">🏠</button>
+        <button class="r-btn" onclick="triggerScreenSaver()" title="Screen Saver">✨</button>
+      </div>
+    </div>
+    
+    <button class="remote-toggle-btn" onclick="toggleRemoteVisibility()" id="remoteToggleBtn">Hide Remote</button>
+  </div>
+
+  <!-- SCRIPT & CONTROLLER LOGIC -->
+  <script>
+    let tvPower = true;
+    let uiVisible = true;
+    let idleTimer = null;
+    const IDLE_LIMIT = 45000;
+    let currentVolume = 80;
+    let hlsInstance = null;
+
+    // Cache Stores & Lazy Load State
+    let allIPTVChannels = [];
+    let filteredChannels = [];
+    let displayedCount = 0;
+    const BATCH_SIZE = 60;
+    let archiveFilter = 'movies';
+
+    let focusableElements = [];
+    let currentFocusIndex = 0;
+
+    const DEFAULT_LOGO = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='%2338bdf8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='7' width='20' height='15' rx='2' ry='2'></rect><polyline points='17 2 12 7 7 2'></polyline></svg>";
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateClock();
+      setInterval(updateClock, 1000);
+      resetIdleTimer();
+
+      ['mousemove', 'keydown', 'touchstart', 'click'].forEach(evt => {
+        window.addEventListener(evt, resetIdleTimer);
+      });
+
+      window.addEventListener('keydown', handleKeyDown);
+
+      // Default home wallpaper setup (No auto-playing video on home screen)
+      setupFocus();
+    });
+
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('osClock').textContent = timeStr;
+      document.getElementById('ssClock').textContent = timeStr;
+    }
+
+    function resetIdleTimer() {
+      if (document.getElementById('screensaver').classList.contains('active')) {
+        dismissScreenSaver();
+      }
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(triggerScreenSaver, IDLE_LIMIT);
+    }
+
+    function togglePower() {
+      tvPower = !tvPower;
+      const casing = document.getElementById('tvCasing');
+      const led = document.getElementById('tvLed');
+      const viewport = document.getElementById('videoViewport');
+
+      if (!tvPower) {
+        casing.classList.add('power-off');
+        led.classList.add('off');
+        viewport.innerHTML = '';
+        if (hlsInstance) hlsInstance.destroy();
+        dismissScreenSaver();
+      } else {
+        casing.classList.remove('power-off');
+        led.classList.remove('off');
+      }
+    }
+
+    function toggleUI() {
+      uiVisible = !uiVisible;
+      document.getElementById('osUiOverlay').classList.toggle('hidden', !uiVisible);
+    }
+
+    function toggleRemoteVisibility() {
+      const remote = document.getElementById('remoteControl');
+      const btn = document.getElementById('remoteToggleBtn');
+      const isCollapsed = remote.classList.toggle('collapsed');
+      btn.textContent = isCollapsed ? 'Show Remote' : 'Hide Remote';
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.dock-item').forEach(el => el.classList.remove('active-tab'));
+      
+      document.getElementById('archivePanel').classList.remove('active');
+      document.getElementById('iptvPanel').classList.remove('active');
+      document.getElementById('customInputPanel').classList.remove('active');
+      document.getElementById('heroInfo').style.display = 'block';
+
+      if (tab === 'home') {
+        document.getElementById('tabHome').classList.add('active-tab');
+        updateHero('AURA OS HOME', 'Quantum OLED Smart Experience', 'Explore full Internet Archive collections via Advanced API search, or stream 29,900+ live TV channels with official logos from around the world using iptv-org GitHub databases.');
+      } else if (tab === 'archive') {
+        document.getElementById('tabArchive').classList.add('active-tab');
+        document.getElementById('archivePanel').classList.add('active');
+        document.getElementById('heroInfo').style.display = 'none';
+        executeArchiveSearch();
+      } else if (tab === 'iptv') {
+        document.getElementById('tabIptv').classList.add('active-tab');
+        document.getElementById('iptvPanel').classList.add('active');
+        document.getElementById('heroInfo').style.display = 'none';
+        fetchIPTVFullDatabase();
+      } else if (tab === 'custom') {
+        document.getElementById('tabCustom').classList.add('active-tab');
+        document.getElementById('customInputPanel').classList.add('active');
+        updateHero('STREAM EMBEDDER', 'Custom Stream Inputs', 'Enter YouTube video URLs or direct HLS (.m3u8) / MP4 stream URLs below.');
+      }
+
+      setTimeout(setupFocus, 100);
+    }
+
+    function updateHero(category, title, desc) {
+      document.getElementById('heroCategory').textContent = category;
+      document.getElementById('heroTitle').textContent = title;
+      document.getElementById('heroDesc').textContent = desc;
+    }
+
+    /* ==========================================================================
+       INTERNET ARCHIVE ADVANCED API SEARCH
+       ========================================================================== */
+    function setArchiveFilter(filterType, btnEl) {
+      archiveFilter = filterType;
+      document.querySelectorAll('#archivePanel .filter-btn').forEach(b => b.classList.remove('active'));
+      btnEl.classList.add('active');
+      executeArchiveSearch();
+    }
+
+    async function executeArchiveSearch() {
+      const grid = document.getElementById('archiveGrid');
+      const queryText = document.getElementById('archiveSearchInput').value.trim();
+      grid.innerHTML = '<div style="color:#94a3b8; font-size:12px;">Searching Internet Archive Advanced API...</div>';
+
+      let mediaQuery = 'mediatype:movies';
+      if (archiveFilter === 'tv') mediaQuery += ' AND (collection:classic_tv OR collection:television)';
+      else if (archiveFilter === 'animation') mediaQuery += ' AND (subject:animation OR collection:animation)';
+
+      let finalQuery = mediaQuery;
+      if (queryText) {
+        finalQuery = `(${mediaQuery}) AND (${queryText})`;
+      }
+
+      const advancedApiUrl = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(finalQuery)}&fl[]=identifier,title,description,year,downloads&sort[]=downloads+desc&rows=30&output=json`;
+
+      try {
+        const response = await fetch(advancedApiUrl);
+        const data = await response.json();
+        const docs = data.response.docs;
+
+        grid.innerHTML = '';
+        if (!docs || docs.length === 0) {
+          grid.innerHTML = '<div style="color:#94a3b8; font-size:12px;">No results found for query.</div>';
+          return;
+        }
+
+        docs.forEach(doc => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.setAttribute('tabindex', '0');
+          card.onclick = () => {
+            playVideo(`https://archive.org/embed/${doc.identifier}`, 'iframe');
+            updateHero('INTERNET ARCHIVE', doc.title || 'Archive Video', doc.description || 'Public domain content from Internet Archive.');
+          };
+
+          card.innerHTML = `
+            <div class="card-body">
+              <div class="card-title">${doc.title || 'Archive Item'}</div>
+              <div class="card-sub">
+                <span>📅 ${doc.year || 'N/A'}</span>
+                <span>⬇️ ${doc.downloads || 0}</span>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+        setupFocus();
+      } catch (err) {
+        grid.innerHTML = '<div style="color:#ef4444; font-size:12px;">Failed to fetch Internet Archive items.</div>';
+      }
+    }
+
+    /* ==========================================================================
+       IPTV-ORG FULL DATABASE INTEGRATION (CHANNELS + STREAMS + LOGOS)
+       ========================================================================== */
+    async function fetchIPTVFullDatabase() {
+      const grid = document.getElementById('iptvGrid');
+      const badge = document.getElementById('iptvCountBadge');
+
+      if (allIPTVChannels.length > 0) {
+        return;
+      }
+
+      grid.innerHTML = '<div style="color:#94a3b8; font-size:12px;">Loading 29,900+ IPTV Channels, Streams & Logos...</div>';
+
+      try {
+        // Fetch Channels, Streams, and Logos in parallel from IPTV-Org API
+        const [chRes, stRes, lgRes] = await Promise.all([
+          fetch('https://iptv-org.github.io/api/channels.json'),
+          fetch('https://iptv-org.github.io/api/streams.json'),
+          fetch('https://iptv-org.github.io/api/logos.json')
+        ]);
+
+        const channels = await chRes.json();
+        const streams = await stRes.json();
+        const logos = await lgRes.json();
+
+        // Index Streams by Channel ID
+        const streamMap = new Map();
+        streams.forEach(st => {
+          if (st.channel && st.url && !streamMap.has(st.channel)) {
+            streamMap.set(st.channel, st.url);
+          }
+        });
+
+        // Index Logos by Channel ID
+        const logoMap = new Map();
+        logos.forEach(lg => {
+          if (lg.channel && lg.url && !logoMap.has(lg.channel)) {
+            logoMap.set(lg.channel, lg.url);
+          }
+        });
+
+        // Combine into unified dataset
+        allIPTVChannels = channels
+          .filter(c => streamMap.has(c.id) && !c.is_nsfw)
+          .map(c => ({
+            id: c.id,
+            name: c.name || 'Unknown Channel',
+            country: c.country || 'GLOBAL',
+            category: c.categories && c.categories.length > 0 ? c.categories[0] : 'General',
+            logo: logoMap.get(c.id) || null,
+            streamUrl: streamMap.get(c.id)
+          }));
+
+        filteredChannels = [...allIPTVChannels];
+        badge.textContent = `${allIPTVChannels.length.toLocaleString()} Channels Available`;
+
+        grid.innerHTML = '';
+        displayedCount = 0;
+        appendMoreIPTVChannels();
+      } catch (err) {
+        grid.innerHTML = '<div style="color:#ef4444; font-size:12px;">Error fetching live IPTV database.</div>';
+      }
+    }
+
+    function appendMoreIPTVChannels() {
+      const grid = document.getElementById('iptvGrid');
+      const nextBatch = filteredChannels.slice(displayedCount, displayedCount + BATCH_SIZE);
+
+      if (nextBatch.length === 0 && displayedCount === 0) {
+        grid.innerHTML = '<div style="color:#94a3b8; font-size:12px;">No matching channels found.</div>';
+        return;
+      }
+
+      nextBatch.forEach(ch => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.setAttribute('tabindex', '0');
+        card.onclick = () => {
+          playVideo(ch.streamUrl, 'hls');
+          updateHero('LIVE IPTV', ch.name, `Country: ${ch.country} | Category: ${ch.category} | Stream: ${ch.streamUrl}`);
+        };
+
+        const logoSrc = ch.logo ? ch.logo : DEFAULT_LOGO;
+
+        card.innerHTML = `
+          <img class="card-logo" src="${logoSrc}" loading="lazy" onerror="this.onerror=null; this.src='${DEFAULT_LOGO}';" alt="logo" />
+          <div class="card-body">
+            <div class="card-title">${ch.name}</div>
+            <div class="card-sub">
+              <span>🌐 ${ch.country}</span>
+              <span>📺 ${ch.category}</span>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      displayedCount += nextBatch.length;
+      setupFocus();
+    }
+
+    function handleIPTVScroll(el) {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60) {
+        if (displayedCount < filteredChannels.length) {
+          appendMoreIPTVChannels();
+        }
+      }
+    }
+
+    function filterIPTVChannels() {
+      const q = document.getElementById('iptvSearchInput').value.toLowerCase();
+      filteredChannels = allIPTVChannels.filter(c => 
+        c.name.toLowerCase().includes(q) || 
+        c.country.toLowerCase().includes(q) ||
+        c.category.toLowerCase().includes(q)
+      );
+
+      const grid = document.getElementById('iptvGrid');
+      grid.innerHTML = '';
+      displayedCount = 0;
+      appendMoreIPTVChannels();
+
+      const badge = document.getElementById('iptvCountBadge');
+      badge.textContent = `${filteredChannels.length.toLocaleString()} Channels`;
+    }
+
+    /* ==========================================================================
+       CUSTOM STREAM & VIDEO ENGINE
+       ========================================================================== */
+    function loadCustomUrl() {
+      const url = document.getElementById('streamUrlInput').value.trim();
+      if (!url) return;
+
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        let videoId = '';
+        if (url.includes('v=')) {
+          videoId = url.split('v=')[1].split('&')[0];
+        } else if (url.includes('youtu.be/')) {
+          videoId = url.split('youtu.be/')[1].split('?')[0];
+        }
+        if (videoId) {
+          playVideo(`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`, 'iframe');
+        }
+      } else if (url.endsWith('.m3u8')) {
+        playVideo(url, 'hls');
+      } else {
+        playVideo(url, 'video');
+      }
+    }
+
+    function playVideo(src, type) {
+      const viewport = document.getElementById('videoViewport');
+      viewport.innerHTML = '';
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
+      }
+
+      if (type === 'iframe') {
+        const iframe = document.createElement('iframe');
+        iframe.src = src;
+        iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+        iframe.allowFullscreen = true;
+        viewport.appendChild(iframe);
+      } else if (type === 'hls') {
+        const video = document.createElement('video');
+        video.controls = true;
+        video.autoplay = true;
+        viewport.appendChild(video);
+
+        if (Hls.isSupported()) {
+          hlsInstance = new Hls();
+          hlsInstance.loadSource(src);
+          hlsInstance.attachMedia(video);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = src;
+        }
+      } else {
+        const video = document.createElement('video');
+        video.src = src;
+        video.controls = true;
+        video.autoplay = true;
+        viewport.appendChild(video);
+      }
+    }
+
+    /* ==========================================================================
+       SCREEN SAVER & KEYBOARD NAVIGATION
+       ========================================================================== */
+    function triggerScreenSaver() {
+      if (!tvPower) return;
+      document.getElementById('screensaver').classList.add('active');
+    }
+
+    function dismissScreenSaver() {
+      document.getElementById('screensaver').classList.remove('active');
+    }
+
+    function setupFocus() {
+      focusableElements = Array.from(document.querySelectorAll('.dock-item, .app-panel.active .card, .app-panel.active .filter-btn, .search-input-box, .url-input, .btn-submit'));
+      currentFocusIndex = 0;
+    }
+
+    function navigate(dir) {
+      if (focusableElements.length === 0) setupFocus();
+      focusableElements.forEach(el => el.classList.remove('focused'));
+
+      if (dir === 'right' || dir === 'down') {
+        currentFocusIndex = (currentFocusIndex + 1) % focusableElements.length;
+      } else if (dir === 'left' || dir === 'up') {
+        currentFocusIndex = (currentFocusIndex - 1 + focusableElements.length) % focusableElements.length;
+      }
+
+      const target = focusableElements[currentFocusIndex];
+      if (target) {
+        target.classList.add('focused');
+        target.focus();
+      }
+    }
+
+    function pressSelect() {
+      const target = focusableElements[currentFocusIndex];
+      if (target) {
+        target.click();
+      }
+    }
+
+    function handleKeyDown(e) {
+      if (!tvPower) return;
+
+      switch(e.key) {
+        case 'ArrowUp':
+          navigate('up');
+          break;
+        case 'ArrowDown':
+          navigate('down');
+          break;
+        case 'ArrowLeft':
+          navigate('left');
+          break;
+        case 'ArrowRight':
+          navigate('right');
+          break;
+        case 'Enter':
+          pressSelect();
+          break;
+        case 'Escape':
+        case 'Backspace':
+          toggleUI();
+          break;
+      }
+    }
+
+    function changeVolume(delta) {
+      currentVolume = Math.min(100, Math.max(0, currentVolume + (delta * 5)));
+      document.getElementById('volumeStatus').textContent = `🔊 ${currentVolume}%`;
+    }
+  </script>
+</body>
+</html>
